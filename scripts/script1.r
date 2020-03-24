@@ -1,11 +1,13 @@
-// Za≈Çadowanie bibliotek
+# Za≥adowanie bibliotek
 library(tm)
+library(hunspell)
+library(stringr)
 
-// Zmiana katalogu roboczego
+# Zmiana katalogu roboczego
 workDir <- "D:\\DS\\TMining"
 setwd(workDir)
 
-// definicja katalog√≥w funkcjonalnych
+# definicja katalogÛw funkcjonalnych
 inputDir <- ".\\data"
 outputDir <- ".\\results"
 scriptsDir <- ".\\scripts"
@@ -14,8 +16,8 @@ dir.create(outputDir, showWarnings = TRUE)
 dir.create(workspacesDir, showWarnings = TRUE)
 
 
-/Zdefiniowanie korpusu dokument√≥W
-corpusDir <- paste(inputDir,"Literatura - streszczenia - orygina≈Ç", sep = "\\")
+#Zdefiniowanie korpusu dokumentÛw
+corpusDir <- paste(inputDir,"Literatura - streszczenia - orygina≥", sep = "\\")
 corpus <- VCorpus(
   DirSource(
     corpusDir,
@@ -27,7 +29,7 @@ corpus <- VCorpus(
   )
 )
 
-// Wstƒôpne przetwarzanie
+# WstÍpne przetwarzanie
 corpus <- tm_map(corpus, removeNumbers)
 corpus <- tm_map(corpus, removePunctuation)
 corpus <- tm_map(corpus, content_transformer(tolower))
@@ -36,6 +38,44 @@ stopList <- readLines(stopListFile, encoding = "UTF-8")
 corpus <- tm_map(corpus, removeWords, stopList)
 corpus <- tm_map(corpus, stripWhitespace)
 
+# UsuniÍcie em dash i 3/4
+removeChar <- content_transformer(function(x,pattern) gsub(pattern, "", x))
+corpus <- tm_map(corpus, removeChar, intToUtf8(8722))
+corpus <- tm_map(corpus, removeChar, intToUtf8(190))
+
+#lematyzacja
+polish <- dictionary(lang="pl_PL")
+
+lemmatize <- function(text){
+  simpleText <-str_trim(as.character(text))
+  parsedText <-strsplit(simpleText, split= " ")
+  newTextVec <- hunspell_stem(parsedText[[1]], dict = polish)
+  for (i in 1:length(newTextVec)) {
+    if (length(newTextVec[[i]]) == 0) newTextVec[i] <- parsedText[[1]][i]
+    if (length(newTextVec[[i]]) > 1) newTextVec[i] <- newTextVec[[i]][1]
+  }
+  newText <- paste(newTextVec, collapse = " ")
+  return(newText)
+}
+corpus <- tm_map(corpus, content_transformer(lemmatize))
+
+#usuniÍcie rozszerzeÒ z nazw plikÛw
+cutExtensions <- function(document) {
+  meta(document, "id") <- gsub(pattern="\\.txt$", replacement = "", meta(document, "id"))
+  return(document)
+}
+corpus <- tm_map(corpus, cutExtensions)
+
+#export zawartoúci korpusu do plikÛW tekstowych
+preprocessedDir <- paste(
+  inputDir,
+  "Literatura - streszczenia - przetworzone",
+  sep = "\\"
+)
+dir.create(preprocessedDir)
+writeCorpus(corpus, path = preprocessedDir)
+
+#Wyúwietlanie zawartoúci
 writeLines(as.character((corpus[[1]])))
 
 
